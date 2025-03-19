@@ -1,4 +1,4 @@
-function run_pca_across_space(file_path, output_path, condition)
+function run_pca_across_space(file_path, output_path, condition, excel_file_path)
     % Load EEG dataset
     EEG = pop_loadset(file_path);
 
@@ -7,7 +7,7 @@ function run_pca_across_space(file_path, output_path, condition)
     time_vector = linspace(-0.5, 3, size(EEG.data, 2)); % Time axis (-500ms to 3000ms)
 
     % Select odd or even epochs based on condition
-    if strcmp(condition, 'BLA') || strcmp(condition, 'P1')
+    if strcmp(condition, 'BLA') || strcmp(condition, 'P1') || strcmp(condition, 'P2')
         epoch_trials = 1:2:EEG.trials; % Odd epochs
     elseif strcmp(condition, 'BLT')
         epoch_trials = 2:2:EEG.trials; % Even epochs
@@ -18,12 +18,29 @@ function run_pca_across_space(file_path, output_path, condition)
     num_trials = length(epoch_trials);
 
     % Define pre- and post-stimulus time windows (400ms before and after stimulus onset at 500ms)
+    pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
     if strcmp(condition, 'BLA') || strcmp(condition, 'BLT')
-        pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
         post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
     elseif strcmp(condition, 'P1')
-        pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
         post_window = [0, 1.020];  % Post-stimulus window (0ms to +1020ms)
+    elseif strcmp(condition, 'P2')
+        % Read data for both conditions
+        trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+        trials_2000ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 2000 ms tactil');
+        
+        % Initialize post-stimulus window variable
+        post_window = [];
+        
+        % Loop through trials
+        for trial = 1:EEG.trials
+            if ismember(trial, trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(trial, trials_2000ms)
+                post_window = [0, 2.400];  % 2000ms condition
+            else
+                continue; % Skip trials not in either list
+            end
+        end
     end
 
     % Convert time to indices

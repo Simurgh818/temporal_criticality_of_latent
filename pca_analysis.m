@@ -1,6 +1,6 @@
 clear; 
 % Define conditions
-conditions = {'BLA','BLT', 'P1'}; % , 'P2', 'P3'  
+conditions = {'BLA','BLT', 'P1', 'P2'}; % , 'P3'  
 
 % Set input and output paths based on system
 if exist('H:\', 'dir')
@@ -18,7 +18,14 @@ for i = 1:length(conditions)
     condition = conditions{i};
     input_path = fullfile(base_input_path, condition);
     output_path = fullfile(base_output_path, condition);
-    
+    if strcmp(condition, 'P2')
+        excel_file_path = fullfile(base_input_path,'Indexes for P2.xlsx');
+    elseif strcmp(condition, 'P3')
+        excel_file_path = fullfile(base_input_path,'Indexes for P3.xlsx');
+    else
+        excel_file_path = '';
+    end
+
     if ~exist(output_path, 'dir')
         mkdir(output_path);
     end
@@ -30,6 +37,7 @@ for i = 1:length(conditions)
     for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
-        run_pca_across_space(file_path, output_path, condition);
+        run_pca_across_space(file_path, output_path, condition, excel_file_path);
+        delete EEG;
     end
 end

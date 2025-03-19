@@ -1,11 +1,20 @@
-function run_pca_across_space(file_path, output_path)
+function run_pca_across_space(file_path, output_path, condition)
     % Load EEG dataset
     EEG = pop_loadset(file_path);
 
     % Extract relevant parameters
     fs = EEG.srate; % Sampling rate
     time_vector = linspace(-0.5, 3, size(EEG.data, 2)); % Time axis (-500ms to 3000ms)
-    epoch_trials = 1:2:EEG.trials; % Select odd trials
+
+    % Select odd or even epochs based on condition
+    if strcmp(condition, 'BLA')
+        epoch_trials = 1:2:EEG.trials; % Odd epochs
+    elseif strcmp(condition, 'BLT')
+        epoch_trials = 2:2:EEG.trials; % Even epochs
+    else
+        error('Condition not recognized. Please specify "BLA" or "BLT".');
+    end
+
     num_trials = length(epoch_trials);
 
     % Define pre- and post-stimulus time windows (400ms before and after stimulus onset at 500ms)
@@ -45,7 +54,7 @@ function run_pca_across_space(file_path, output_path)
 
     % Plot as heatmap
     figure;
-    imagesc(epoch_trials, 1:10, pc_diff_squared(:, 1:10)'); % Transpose so PCs are on the y-axis
+    imagesc(1:length(epoch_trials)-1, 1:10, pc_diff_squared(:, 1:10)'); % Transpose so PCs are on the y-axis
     colorbar;
     xlabel('Trial Number');
     ylabel('Principal Component');

@@ -1,6 +1,6 @@
-
+clear; 
 % Define conditions
-conditions = {'BLA'}; % ,'BLT', 'P1', 'P2', 'P3'  
+conditions = {'BLA','BLT'}; % , 'P1', 'P2', 'P3'  
 
 % Set input and output paths based on system
 if exist('H:\', 'dir')
@@ -30,6 +30,6 @@ for i = 1:length(conditions)
     for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
-        run_pca_across_space(file_path, output_path);
+        run_pca_across_space(file_path, output_path, condition);
     end
 end

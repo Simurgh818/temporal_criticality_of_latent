@@ -1,6 +1,6 @@
 clear; 
 % Define conditions
-conditions = {'BLA','BLT'}; % , 'P1', 'P2', 'P3'  
+conditions = {'BLA','BLT', 'P1'}; % , 'P2', 'P3'  
 
 % Set input and output paths based on system
 if exist('H:\', 'dir')

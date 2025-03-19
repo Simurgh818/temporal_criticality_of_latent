@@ -1,85 +1,62 @@
 function run_pca_across_space(file_path, output_path)
-    % Load EEG data
+    % Load EEG dataset
     EEG = pop_loadset(file_path);
-    fs = EEG.srate;  % Sampling frequency in Hz
 
-    ic_data = EEG.icaact(:, :); 
+    % Extract relevant parameters
+    fs = EEG.srate; % Sampling rate
+    time_vector = linspace(-0.5, 3, size(EEG.data, 2)); % Time axis (-500ms to 3000ms)
+    epoch_trials = 1:2:EEG.trials; % Select odd trials
+    num_trials = length(epoch_trials);
 
-    % Extract epochs
-    odd_epochs = 1:2:EEG.trials;
-    ic_data_odd = EEG.icaact(:, :, odd_epochs);
-    
-    % Bandpass filter beta band (13-30 Hz)
-    beta_band = [13 30];
-    beta_signal = zeros(size(ic_data_odd)); % Preallocate
-    for epoch = 1:size(ic_data_odd, 3)
-        beta_signal(:,:,epoch) = bandpass(ic_data_odd(:,:,epoch)', beta_band, fs)';
-    end
-    avg_ic_data = mean(beta_signal, 3); 
+    % Define pre- and post-stimulus time windows (400ms before and after stimulus onset at 500ms)
+    pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
+    post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
 
-    % Define PCA parameters
-    num_windows = 20;
-    window_size = floor(size(avg_ic_data, 2) / num_windows);
-    
-    PCA_results = struct();
-    all_scores = cell(1, num_windows);
-    max_PCs = 0;
+    % Convert time to indices
+    pre_idx = find(time_vector >= pre_window(1) & time_vector <= pre_window(2));
+    post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
 
-    % Loop over time windows
-    for w = 1:num_windows
-        start_idx = (w-1) * window_size + 1;
-        end_idx = min(w * window_size, size(avg_ic_data, 2));
-        window_data = avg_ic_data(:, start_idx:end_idx);
+    % Initialize results matrix (Trials x PCs)
+    num_pcs = 32; % Number of Principal Components to extract
+    pc_diff_squared = zeros(num_trials, num_pcs);
 
-        % Perform PCA
-        [coeff, score, latent] = pca(window_data');
-        explained_variance = cumsum(latent) / sum(latent);
-        num_components = find(explained_variance >= 0.85, 1);
-        if isempty(num_components), num_components = 1; end
-        num_components = min(num_components, size(score, 2));
+    % Loop through each selected trial
+    for i = 1:num_trials
+        trial_idx = epoch_trials(i);
+        trial_data = squeeze(EEG.data(:, :, trial_idx)); % Channels x Time
 
-        % Store results
-        PCA_results(w).time_window = [start_idx, end_idx];
-        PCA_results(w).scores = score(:, 1:num_components);
-        PCA_results(w).explained_variance = explained_variance(1:num_components);
-        all_scores{w} = score(:, 1:num_components);
-        max_PCs = max(max_PCs, num_components);
+        % Perform PCA on the trial
+        [coeff, score, ~] = pca(trial_data'); % Time x Channels -> PCA
+
+        % Extract PCs within time windows
+        pre_pcs = score(pre_idx, :); % Pre-stimulus PCs
+        post_pcs = score(post_idx, :); % Post-stimulus PCs
+
+        % Compute difference, then square
+        pc_diff = sum(post_pcs, 1) - sum(pre_pcs, 1); % Sum across time, subtract pre from post
+        pc_diff_squared(i, :) = pc_diff.^2; % Square each PC difference
     end
 
-    % Normalize and prepare for plotting
-    for w = 1:num_windows
-        num_PCs = size(all_scores{w}, 2);
-        if num_PCs < max_PCs
-            all_scores{w} = [all_scores{w}, NaN(size(all_scores{w}, 1), max_PCs - num_PCs)];
-        end
-    end
-    all_scores_matrix = cell2mat(all_scores);
-    global_min = min(all_scores_matrix(:), [], 'omitnan');
-    global_max = max(all_scores_matrix(:), [], 'omitnan');
+    % Extract filename for saving
+    [~, filename, ~] = fileparts(file_path);
 
-    % Plot results
+    % Save squared differences matrix as .mat file
+    save(fullfile(output_path, [filename '_pc_diff_squared.mat']), 'pc_diff_squared');
+
+    % Plot as heatmap
     figure;
-    for w = 1:num_windows
-        subplot(4, 5, w);
-        imagesc(PCA_results(w).scores');
-        colormap jet;
-        caxis([global_min global_max]);
-        colorbar;
-        xlabel('Time (3.5 sec)');
-        ylabel('PCs');
-        title(['Window ' num2str(w)]);
-    end
+    imagesc(epoch_trials, 1:10, pc_diff_squared(:, 1:10)'); % Transpose so PCs are on the y-axis
+    colorbar;
+    xlabel('Trial Number');
+    ylabel('Principal Component');
+    title(['Squared Differences of PCs: ', filename]);
+    set(gca, 'YDir', 'normal'); % Ensure correct orientation
+    colormap jet;
 
-    % Extract filename token for saving
-    [~, file_name, ~] = fileparts(file_path);
-    last_token = regexp(file_name, '\s+', 'split');
-    last_token = last_token{end};
+    % Save figure
+    savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
+    saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
+    close(gcf); % Close the figure to save memory
 
-    % Save outputs
-    saveas(gcf, fullfile(output_path, ['PCA_Heatmaps_' last_token '.png']));
-    saveas(gcf, fullfile(output_path, ['PCA_Heatmaps_' last_token '.fig']));
-    save(fullfile(output_path, ['PCA_results_' last_token '.mat']), 'PCA_results');
-    close(gcf);
-
-    fprintf('Finished processing %s\n', file_name);
+    fprintf('Processing complete: %s\n', filename);
 end

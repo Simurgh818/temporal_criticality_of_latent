@@ -7,7 +7,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     time_vector = linspace(-0.5, 3, size(EEG.data, 2)); % Time axis (-500ms to 3000ms)
 
     % Select odd or even epochs based on condition
-    if strcmp(condition, 'BLA') || strcmp(condition, 'P1') || strcmp(condition, 'P2')
+    if strcmp(condition, 'BLA') || strcmp(condition, 'P1') || strcmp(condition, 'P2') || strcmp(condition, 'P3')
         epoch_trials = 1:2:EEG.trials; % Odd epochs
     elseif strcmp(condition, 'BLT')
         epoch_trials = 2:2:EEG.trials; % Even epochs
@@ -39,7 +39,20 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
                 post_window = [0, 2.400];  % 2000ms condition
             else
                 continue; % Skip trials not in either list
-            end
+            end        
+        end
+    elseif strcmp(condition, 'P3')
+        trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+        trials_missing = readmatrix(excel_file_path, 'Sheet', 'Audio onset with missing tactil');
+        % Loop through trials
+        for trial = 1:EEG.trials
+            if ismember(trial, trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(trial, trials_missing)
+                post_window = [0, 1.020];  % 2000ms condition
+            else
+                continue; % Skip trials not in either list
+            end        
         end
     end
 

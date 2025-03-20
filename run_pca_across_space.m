@@ -16,6 +16,14 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     end
 
     num_trials = length(epoch_trials);
+    data = EEG.data(:, :, epoch_trials);
+
+    % Bandpass filter beta band (13-30 Hz)
+    beta_band = [13 30];
+    beta_signal = zeros(size(data)); % Preallocate
+    for epoch = 1:size(data, 3)
+        beta_signal(:,:,epoch) = bandpass(data(:,:,epoch)', beta_band, fs)';
+    end
 
     % Define pre- and post-stimulus time windows (400ms before and after stimulus onset at 500ms)
     pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
@@ -66,8 +74,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Loop through each selected trial
     for i = 1:num_trials
-        trial_idx = epoch_trials(i);
-        trial_data = squeeze(EEG.data(:, :, trial_idx)); % Channels x Time
+        trial_data = squeeze(EEG.data(:, :, i)); % Channels x Time
 
         % Perform PCA on the trial
         [coeff, score, ~] = pca(trial_data'); % Time x Channels -> PCA

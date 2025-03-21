@@ -79,15 +79,17 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     for i = 1:num_trials
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
     
-        % Perform PCA on the trial
-        [coeff, score, ~] = pca(trial_data'); % Time x Channels -> PCA
+        % PCA on pre-stimulus window
+        pre_data = trial_data(:, pre_idx)';
+        [~, pre_score, ~] = pca(pre_data);
         
-        % Extract PCs within time windows
-        pre_pcs = score(pre_idx, :); % Pre-stimulus PCs
-        post_pcs = score(post_idx, :); % Post-stimulus PCs
+        % PCA on post-stimulus window
+        post_data = trial_data(:, post_idx)';
+        [~, post_score, ~] = pca(post_data);
     
-        % Compute difference and square
-        pc_diff = sum(post_pcs, 1) - sum(pre_pcs, 1); % Sum across time, subtract pre from post
+        % Compute difference of sum, and square
+        pc_diff = sum(post_score, 1) - sum(pre_score, 1); % Sum across time, subtract pre from post
+
         pc_diff_squared(i,:) = pc_diff.^2; % Square
     
         pc_mean = mean(pc_diff_squared(i, :));  % Mean across PCs for this trial
@@ -110,7 +112,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Plot as heatmap
     figure;
-    imagesc(1:length(epoch_trials)-1, 1:15, pc_diff_squared_z(:, 1:15)'); % Transpose so PCs are on the y-axis
+    imagesc(1:length(epoch_trials)-1, 1:(length(pc_diff)), pc_diff_squared_z'); % Transpose so PCs are on the y-axis
     colorbar;
     xlabel('Trial Number');
     ylabel('Principal Component');

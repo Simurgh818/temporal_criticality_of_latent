@@ -71,21 +71,35 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
     pc_diff_squared = zeros(num_trials, num_pcs);
+    
+    % Initialize matrix for normalized values
+    pc_diff_squared_z = zeros(size(pc_diff_squared));
 
     % Loop through each selected trial
     for i = 1:num_trials
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
-
+    
         % Perform PCA on the trial
         [coeff, score, ~] = pca(trial_data'); % Time x Channels -> PCA
-
+        
         % Extract PCs within time windows
         pre_pcs = score(pre_idx, :); % Pre-stimulus PCs
         post_pcs = score(post_idx, :); % Post-stimulus PCs
-
-        % Compute difference, then square
+    
+        % Compute difference and square
         pc_diff = sum(post_pcs, 1) - sum(pre_pcs, 1); % Sum across time, subtract pre from post
-        pc_diff_squared(i, :) = pc_diff.^2; % Square each PC difference
+        pc_diff_squared(i,:) = pc_diff.^2; % Square
+    
+        pc_mean = mean(pc_diff_squared(i, :));  % Mean across PCs for this trial
+        pc_std = std(pc_diff_squared(i, :));   % Standard deviation across PCs for this trial
+        
+        % Avoid division by zero
+        if pc_std == 0
+            pc_std = 1;
+        end
+        
+        % Compute z-score normalized values within the trial
+        pc_diff_squared_z(i, :) = (pc_diff_squared(i, :) - pc_mean) / pc_std;
     end
 
     % Extract filename for saving
@@ -96,7 +110,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Plot as heatmap
     figure;
-    imagesc(1:length(epoch_trials)-1, 1:10, pc_diff_squared(:, 1:10)'); % Transpose so PCs are on the y-axis
+    imagesc(1:length(epoch_trials)-1, 1:15, pc_diff_squared_z(:, 1:15)'); % Transpose so PCs are on the y-axis
     colorbar;
     xlabel('Trial Number');
     ylabel('Principal Component');
@@ -110,7 +124,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     close(gcf); % Close the figure to save memory
 
     fprintf('Processing complete: %s\n', filename);
-    
+
     close all;
 
     % Clear large variables to free memory

@@ -74,7 +74,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Loop through each selected trial
     for i = 1:num_trials
-        trial_data = squeeze(EEG.data(:, :, i)); % Channels x Time
+        trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
 
         % Perform PCA on the trial
         [coeff, score, ~] = pca(trial_data'); % Time x Channels -> PCA
@@ -110,4 +110,9 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     close(gcf); % Close the figure to save memory
 
     fprintf('Processing complete: %s\n', filename);
+    
+    close all;
+
+    % Clear large variables to free memory
+    clearvars -except file_path output_path condition excel_file_path;
 end

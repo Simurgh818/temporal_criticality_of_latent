@@ -27,46 +27,11 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Define pre- and post-stimulus time windows (400ms before and after stimulus onset at 500ms)
     pre_window = [-0.4, 0];  % Pre-stimulus window (-400ms to 0ms)
-    if strcmp(condition, 'BLA') || strcmp(condition, 'BLT')
-        post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
-    elseif strcmp(condition, 'P1')
-        post_window = [0, 1.020];  % Post-stimulus window (0ms to +1020ms)
-    elseif strcmp(condition, 'P2')
-        % Read data for both conditions
-        trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
-        trials_2000ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 2000 ms tactil');
-        
-        % Initialize post-stimulus window variable
-        post_window = [];
-        
-        % Loop through trials
-        for trial = 1:EEG.trials
-            if ismember(trial, trials_500ms)
-                post_window = [0, 1.020];  % 500ms condition
-            elseif ismember(trial, trials_2000ms)
-                post_window = [0, 2.400];  % 2000ms condition
-            else
-                continue; % Skip trials not in either list
-            end        
-        end
-    elseif strcmp(condition, 'P3')
-        trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
-        trials_missing = readmatrix(excel_file_path, 'Sheet', 'Audio onset with missing tactil');
-        % Loop through trials
-        for trial = 1:EEG.trials
-            if ismember(trial, trials_500ms)
-                post_window = [0, 1.020];  % 500ms condition
-            elseif ismember(trial, trials_missing)
-                post_window = [0, 1.020];  % 2000ms condition
-            else
-                continue; % Skip trials not in either list
-            end        
-        end
-    end
+    % Initialize post-stimulus window variable
+    post_window = [];
 
     % Convert time to indices
     pre_idx = find(time_vector >= pre_window(1) & time_vector <= pre_window(2));
-    post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
 
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
@@ -77,6 +42,38 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Loop through each selected trial
     for i = 1:num_trials
+        if strcmp(condition, 'BLA') || strcmp(condition, 'BLT')
+            post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
+        elseif strcmp(condition, 'P1')
+            post_window = [0, 1.020];  % Post-stimulus window (0ms to +1020ms)
+        elseif strcmp(condition, 'P2')
+            % Read data for both conditions
+            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+            trials_2000ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 2000 ms tactil');
+            
+            if ismember(epoch_trials(i), trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(epoch_trials(i), trials_2000ms)
+                post_window = [0, 2.400];  % 2000ms condition
+            else
+                continue; % Skip trials not in either list
+            end        
+            
+        elseif strcmp(condition, 'P3')
+            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+            trials_missing = readmatrix(excel_file_path, 'Sheet', 'Audio onset with missing tactil');
+
+            if ismember(epoch_trials(i), trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(epoch_trials(i), trials_missing)
+                post_window = [0, 1.020];  % missing condition
+            else
+                continue; % Skip trials not in either list
+            end        
+            
+        end
+
+        post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
     
         % PCA on pre-stimulus window
@@ -109,21 +106,108 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Save squared differences matrix as .mat file
     save(fullfile(output_path, [filename '_pc_diff_squared.mat']), 'pc_diff_squared');
+    
+    if strcmp(condition, 'BLA') || strcmp(condition, 'BLT') || strcmp(condition, 'P1') 
 
-    % Plot as heatmap
-    figure;
-    imagesc(1:length(epoch_trials)-1, 1:(length(pc_diff)), pc_diff_squared_z'); % Transpose so PCs are on the y-axis
-    colorbar;
-    xlabel('Trial Number');
-    ylabel('Principal Component');
-    title(['Squared Differences of PCs: ', filename]);
-    set(gca, 'YDir', 'normal'); % Ensure correct orientation
-    colormap jet;
+        % Plot as heatmap
+        figure;
+        imagesc(1:length(epoch_trials)-1, 1:(length(pc_diff)), pc_diff_squared_z'); % Transpose so PCs are on the y-axis
+        colorbar;
+        xlabel('Trial Number');
+        ylabel('Principal Component');
+        title(['Squared Differences of PCs: ', filename]);
+        set(gca, 'YDir', 'normal'); % Ensure correct orientation
+        colormap jet;
+    
+        % Save figure
+        savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
+        saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
+        close(gcf); % Close the figure to save memory
+    elseif strcmp(condition, 'P2')
+        % Plot heatmaps for 500ms and 2000ms trials separately
 
-    % Save figure
-    savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
-    saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
-    close(gcf); % Close the figure to save memory
+        % Identify indices of 500ms and 2000ms trials
+        idx_500 = ismember(epoch_trials, trials_500ms);
+        idx_2000 = ismember(epoch_trials, trials_2000ms);
+        
+        % Extract corresponding values
+        pc_diff_squared_z_500 = pc_diff_squared_z(idx_500, :);
+        pc_diff_squared_z_2000 = pc_diff_squared_z(idx_2000, :);
+        
+        % Plot in subplots
+        figure('Position', [100, 100, 1000, 400]); % [x, y, width, height]
+        
+        % Subplot for 500ms trials
+        subplot(1, 2, 1);
+        imagesc(1:size(pc_diff_squared_z_500, 1), 1:(length(pc_diff_squared_z_500)), pc_diff_squared_z_500');
+        colorbar;
+        xlabel('Trial Number');
+        ylabel('Principal Component');
+        title('500ms Trials: Normalized Squared Differences');
+        set(gca, 'YDir', 'normal');
+        colormap jet;
+        
+        % Subplot for 2000ms trials
+        subplot(1, 2, 2);
+        imagesc(1:size(pc_diff_squared_z_2000, 1), 1:(length(pc_diff_squared_z_2000)), pc_diff_squared_z_2000');
+        colorbar;
+        xlabel('Trial Number');
+        ylabel('Principal Component');
+        title('2000ms Trials: Normalized Squared Differences');
+        set(gca, 'YDir', 'normal');
+        colormap jet;
+        
+        % Ensure proper layout
+        sgtitle('Comparison of 500ms vs 2000ms Trials');
+                
+        % Save figure
+        savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
+        saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
+        close(gcf); % Close the figure to save memory
+
+    elseif strcmp(condition, 'P3')
+        % Plot heatmaps for 500ms and Missing trials separately
+
+        % Identify indices of 500ms and 2000ms trials
+        idx_500 = ismember(epoch_trials, trials_500ms);
+        idx_missing = ismember(epoch_trials, trials_missing);
+        
+        % Extract corresponding values
+        pc_diff_squared_z_500 = pc_diff_squared_z(idx_500, :);
+        pc_diff_squared_z_missing = pc_diff_squared_z(idx_missing, :);
+        
+        % Plot in subplots
+        figure('Position', [100, 100, 1000, 400]); % [x, y, width, height]
+        
+        % Subplot for 500ms trials
+        subplot(1, 2, 1);
+        imagesc(1:size(pc_diff_squared_z_500, 1), 1:(length(pc_diff_squared_z_500)), pc_diff_squared_z_500');
+        colorbar;
+        xlabel('Trial Number');
+        ylabel('Principal Component');
+        title('500ms Trials: Normalized Squared Differences');
+        set(gca, 'YDir', 'normal');
+        colormap jet;
+        
+        % Subplot for 2000ms trials
+        subplot(1, 2, 2);
+        imagesc(1:size(pc_diff_squared_z_missing, 1), 1:(length(pc_diff_squared_z_missing)), pc_diff_squared_z_missing');
+        colorbar;
+        xlabel('Trial Number');
+        ylabel('Principal Component');
+        title('Missing Trials: Normalized Squared Differences');
+        set(gca, 'YDir', 'normal');
+        colormap jet;
+        
+        % Ensure proper layout
+        sgtitle('Comparison of 500ms vs Missing Trials');
+        
+        % Save figure
+        savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
+        saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
+        close(gcf); % Close the figure to save memory
+
+    end
 
     fprintf('Processing complete: %s\n', filename);
 

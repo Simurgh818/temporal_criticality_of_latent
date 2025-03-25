@@ -36,7 +36,8 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
     pc_diff_squared = zeros(num_trials, num_pcs);
-    
+    pc_cumulative_explained = zeros(num_trials, num_pcs);
+
     % Initialize matrix for normalized values
     pc_diff_squared_z = zeros(size(pc_diff_squared));
 
@@ -75,14 +76,14 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
         post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
-    
+            
         % PCA on pre-stimulus window
         pre_data = trial_data(:, pre_idx)';
-        [~, pre_score, ~] = pca(pre_data);
+        [~, pre_score, ~, ~, explained_pre] = pca(pre_data);
         
         % PCA on post-stimulus window
         post_data = trial_data(:, post_idx)';
-        [~, post_score, ~] = pca(post_data);
+        [~, post_score, ~, ~, explained_post] = pca(post_data);
     
         % Compute difference of sum, and square
         pc_diff = sum(post_score, 1) - sum(pre_score, 1); % Sum across time, subtract pre from post
@@ -99,16 +100,25 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         
         % Compute z-score normalized values within the trial
         pc_diff_squared_z(i, :) = (pc_diff_squared(i, :) - pc_mean) / pc_std;
+        
+        % Compute cumulative sum of explained variance
+        cumulative_explained_pre = cumsum(explained_pre);
+        cumulative_explained_post = cumsum(explained_post);
+        pc_cumulative_explained (i,:) = cumulative_explained_post - cumulative_explained_pre; 
+
     end
+
+
 
     % Extract filename for saving
     [~, filename, ~] = fileparts(file_path);
 
     % Save squared differences matrix as .mat file
-    save(fullfile(output_path, [filename '_pc_diff_squared.mat']), 'pc_diff_squared');
+    save(fullfile(output_path, [filename '_pc_diff_squared.mat']), 'pc_diff_squared_z');
+    save(fullfile(output_path, [filename 'pc_cumulative_explained.mat']), 'pc_cumulative_explained');
     
     if strcmp(condition, 'BLA') || strcmp(condition, 'BLT') || strcmp(condition, 'P1') 
-
+        
         % Plot as heatmap
         figure;
         imagesc(1:length(epoch_trials)-1, 1:(length(pc_diff)), pc_diff_squared_z'); % Transpose so PCs are on the y-axis

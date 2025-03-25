@@ -37,9 +37,11 @@ for i = 1:length(conditions)
     for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
-        run_pca_across_space(file_path, output_path, condition, excel_file_path);
+%         run_pca_across_space(file_path, output_path, condition, excel_file_path);
         clear EEG beta_signal trial_data coeff score pre_pcs post_pcs pc_diff;
         
     end
 
 end
+
+plot_cumulative_sum_vs_pcs(base_output_path);

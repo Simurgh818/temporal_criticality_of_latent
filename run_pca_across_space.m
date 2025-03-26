@@ -32,18 +32,20 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Convert time to indices
     pre_idx = find(time_vector >= pre_window(1) & time_vector <= pre_window(2));
-
+    post_idx = [];
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
     allTrial_score = zeros(num_trials, length(time_vector), num_pcs);
     allTrial_pre_pcs = zeros(num_trials, length(pre_idx), num_pcs);
-    allTrial_post_pcs = zeros(num_trials, length(pre_idx)+1, num_pcs);
+    allTrial_post_pcs = cell(num_trials, 1);
+%     allTrial_post_pcs = zeros(num_trials, length(pre_idx)+1, num_pcs);
     allTrial_coeff = zeros(num_trials, num_pcs, num_pcs);
     allTrial_varExpl = zeros(num_pcs, num_trials);
     allTrial_scorepre = zeros(num_trials, length(pre_idx), num_pcs);
     allTrial_coeffpre = zeros(num_trials, num_pcs, num_pcs);
     allTrial_varExplpre =zeros(num_pcs, num_trials);
-    allTrial_scorepost = zeros(num_trials, length(pre_idx)+1,num_pcs);
+%     allTrial_scorepost = zeros(num_trials, length(pre_idx)+1,num_pcs);
+    allTrial_scorepost = cell(num_trials,1);
     allTrial_coeffpost = zeros(num_trials, num_pcs, num_pcs);
     allTrial_varExplpost =zeros(num_pcs, num_trials);
 
@@ -92,7 +94,8 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         % PCA on the whole epoch
         [allTrial_coeff(i,:,:), allTrial_score(i,:,:), ~, ~, allTrial_varExpl(:, i)] = pca(trial_data');
         allTrial_pre_pcs(i,:,:) = allTrial_score(i, pre_idx, :);
-        allTrial_post_pcs(i,:,:) = allTrial_score(i, post_idx, :);
+%         allTrial_post_pcs(i,:,:) = allTrial_score(i, post_idx, :);
+        allTrial_post_pcs{i} = allTrial_score(i, post_idx, :);
 
         % PCA on pre-stimulus window
         pre_data = trial_data(:, pre_idx)';
@@ -100,10 +103,10 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         
         % PCA on post-stimulus window
         post_data = trial_data(:, post_idx)';
-        [allTrial_coeffpost(i,:,:), allTrial_scorepost(i,:,:), ~, ~, allTrial_varExplpost(:, i)] = pca(post_data);
+        [allTrial_coeffpost(i,:,:), allTrial_scorepost{i}, ~, ~, allTrial_varExplpost(:, i)] = pca(post_data);
     
         % Compute difference of sum, and square
-        pc_diff = sum(allTrial_scorepost(i,:,:), 2) - sum(allTrial_scorepre(i,:,:), 2); % Sum across time, subtract pre from post
+        pc_diff = sum(allTrial_scorepost{i}, 1) - sum(squeeze(allTrial_scorepre(i,:,:)), 1); % Sum across time, subtract pre from post
 
         pc_diff_squared(i,:) = pc_diff.^2; % Square
     
@@ -284,9 +287,9 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         xlabel('time')
         
         nexttile
-        plot(time_vector(post_idx), squeeze(allTrial_post_pcs(i,:,:)))
+        plot(time_vector(post_idx), squeeze(allTrial_post_pcs{i}))
         hold on
-        plot(time_vector(post_idx), squeeze(allTrial_scorepost(i,:,:)), '.-', 'linewidth', 1)
+        plot(time_vector(post_idx), squeeze(allTrial_scorepost{i}), '.-', 'linewidth', 1)
         title(['trial ' num2str(i) ', post'])
         ylabel('components (post)')
         xlabel('time')

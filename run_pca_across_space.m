@@ -35,8 +35,20 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
+    allTrial_score = zeros(num_trials, length(time_vector), num_pcs);
+    allTrial_pre_pcs = zeros(num_trials, length(pre_idx), num_pcs);
+    allTrial_post_pcs = zeros(num_trials, length(pre_idx)+1, num_pcs);
+    allTrial_coeff = zeros(num_trials, num_pcs, num_pcs);
+    allTrial_varExpl = zeros(num_pcs, num_trials);
+    allTrial_scorepre = zeros(num_trials, length(pre_idx), num_pcs);
+    allTrial_coeffpre = zeros(num_trials, num_pcs, num_pcs);
+    allTrial_varExplpre =zeros(num_pcs, num_trials);
+    allTrial_scorepost = zeros(num_trials, length(pre_idx)+1,num_pcs);
+    allTrial_coeffpost = zeros(num_trials, num_pcs, num_pcs);
+    allTrial_varExplpost =zeros(num_pcs, num_trials);
+
     pc_diff_squared = zeros(num_trials, num_pcs);
-    pc_cumulative_explained = zeros(num_trials, num_pcs);
+    pc_cumulative_explained = zeros( num_pcs, num_trials);
 
     % Initialize matrix for normalized values
     pc_diff_squared_z = zeros(size(pc_diff_squared));
@@ -76,17 +88,22 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
         post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
-            
+        
+        % PCA on the whole epoch
+        [allTrial_coeff(i,:,:), allTrial_score(i,:,:), ~, ~, allTrial_varExpl(:, i)] = pca(trial_data');
+        allTrial_pre_pcs(i,:,:) = allTrial_score(i, pre_idx, :);
+        allTrial_post_pcs(i,:,:) = allTrial_score(i, post_idx, :);
+
         % PCA on pre-stimulus window
         pre_data = trial_data(:, pre_idx)';
-        [~, pre_score, ~, ~, explained_pre] = pca(pre_data);
+        [allTrial_coeffpre(i,:,:), allTrial_scorepre(i,:,:), ~, ~, allTrial_varExplpre(:, i)] = pca(pre_data);
         
         % PCA on post-stimulus window
         post_data = trial_data(:, post_idx)';
-        [~, post_score, ~, ~, explained_post] = pca(post_data);
+        [allTrial_coeffpost(i,:,:), allTrial_scorepost(i,:,:), ~, ~, allTrial_varExplpost(:, i)] = pca(post_data);
     
         % Compute difference of sum, and square
-        pc_diff = sum(post_score, 1) - sum(pre_score, 1); % Sum across time, subtract pre from post
+        pc_diff = sum(allTrial_scorepost(i,:,:), 2) - sum(allTrial_scorepre(i,:,:), 2); % Sum across time, subtract pre from post
 
         pc_diff_squared(i,:) = pc_diff.^2; % Square
     
@@ -102,9 +119,9 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         pc_diff_squared_z(i, :) = (pc_diff_squared(i, :) - pc_mean) / pc_std;
         
         % Compute cumulative sum of explained variance
-        cumulative_explained_pre = cumsum(explained_pre);
-        cumulative_explained_post = cumsum(explained_post);
-        pc_cumulative_explained (i,:) = cumulative_explained_post - cumulative_explained_pre; 
+        cumulative_explained_pre = cumsum(allTrial_varExplpre(:,i));
+        cumulative_explained_post = cumsum(allTrial_varExplpost(:, i));
+        pc_cumulative_explained (:, i) = cumulative_explained_post - cumulative_explained_pre; 
 
     end
 
@@ -114,7 +131,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     [~, filename, ~] = fileparts(file_path);
 
     % Save squared differences matrix as .mat file
-    save(fullfile(output_path, [filename '_pc_diff_squared.mat']), 'pc_diff_squared_z');
+    save(fullfile(output_path, [filename '_pc_diff_squared_z.mat']), 'pc_diff_squared_z');
     save(fullfile(output_path, [filename 'pc_cumulative_explained.mat']), 'pc_cumulative_explained');
     
     if strcmp(condition, 'BLA') || strcmp(condition, 'BLT') || strcmp(condition, 'P1') 
@@ -219,6 +236,94 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     end
 
+    figure('Position', [100, 100, 1200, 800]); % [x, y, width, height]
+    tiledlayout(4, 6)
+    sgtitle([filename 'Comparison of pre and post stimulus PCs']);
+    % Audrey's plot to compare selected PCs in trial1,4,8 and 60
+    for i = [1 4 8 num_trials]
+        % add the if statements for different conditions post_idx 
+        if strcmp(condition, 'BLA') || strcmp(condition, 'BLT')
+            post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
+        elseif strcmp(condition, 'P1')
+            post_window = [0, 1.020];  % Post-stimulus window (0ms to +1020ms)
+        elseif strcmp(condition, 'P2')
+            % Read data for both conditions
+            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+            trials_2000ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 2000 ms tactil');
+            
+            if ismember(epoch_trials(i), trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(epoch_trials(i), trials_2000ms)
+                post_window = [0, 2.400];  % 2000ms condition
+            else
+                continue; % Skip trials not in either list
+            end        
+            
+        elseif strcmp(condition, 'P3')
+            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
+            trials_missing = readmatrix(excel_file_path, 'Sheet', 'Audio onset with missing tactil');
+
+            if ismember(epoch_trials(i), trials_500ms)
+                post_window = [0, 1.020];  % 500ms condition
+            elseif ismember(epoch_trials(i), trials_missing)
+                post_window = [0, 1.020];  % missing condition
+            else
+                continue; % Skip trials not in either list
+            end        
+            
+        end
+
+        post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
+
+        nexttile
+        plot(time_vector(pre_idx), squeeze(allTrial_pre_pcs(i,:,:)) )
+        hold on
+        plot(time_vector(pre_idx), squeeze(allTrial_scorepre(i,:, :)), '.-', 'linewidth', 1)
+        title(['trial ' num2str(i) ', pre'])
+        ylabel('components (pre)')
+        xlabel('time')
+        
+        nexttile
+        plot(time_vector(post_idx), squeeze(allTrial_post_pcs(i,:,:)))
+        hold on
+        plot(time_vector(post_idx), squeeze(allTrial_scorepost(i,:,:)), '.-', 'linewidth', 1)
+        title(['trial ' num2str(i) ', post'])
+        ylabel('components (post)')
+        xlabel('time')
+        
+        nexttile
+        imagesc(squeeze(allTrial_coeff (i, :,1:4)))
+        ylabel('channels')
+        xlabel('PC#')
+        title('channel weights, full')
+        
+        nexttile
+        imagesc(squeeze(allTrial_coeffpre(i, :, 1:4)))
+        ylabel('channels')
+        xlabel('PC#')
+        title('channel weights, pre')
+        
+        nexttile
+        imagesc(squeeze(allTrial_coeffpost(i, :, 1:4)))
+        ylabel('channels')
+        xlabel('PC#')
+        title('channel weights, post')
+        
+        nexttile
+        hold on
+        plot(allTrial_varExpl(:,i), 'o-')
+        plot(allTrial_varExplpre(:,i), '*-')
+        plot(allTrial_varExplpost(:,i), '^-')
+        xlim([0 6])
+        ylabel('PC VarExpl')
+        legend({'full', 'pre', 'post'})
+    end
+
+    % Save figure
+    savefig(fullfile(output_path, [filename '_pc_prePost_plot.fig'])); % Save as .fig
+    saveas(gcf, fullfile(output_path, [filename '_pc_prePost_plot.png'])); % Save as .png
+    close(gcf); % Close the figure to save memory
+    
     fprintf('Processing complete: %s\n', filename);
 
     close all;

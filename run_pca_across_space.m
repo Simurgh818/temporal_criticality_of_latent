@@ -35,25 +35,11 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     post_idx = [];
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
-    allTrial_score = zeros(num_trials, length(time_vector), num_pcs);
-    allTrial_pre_pcs = zeros(num_trials, length(pre_idx), num_pcs);
-    allTrial_post_pcs = cell(num_trials, 1);
-%     allTrial_post_pcs = zeros(num_trials, length(pre_idx)+1, num_pcs);
-    allTrial_coeff = zeros(num_trials, num_pcs, num_pcs);
-    allTrial_varExpl = zeros(num_pcs, num_trials);
-    allTrial_scorepre = zeros(num_trials, length(pre_idx), num_pcs);
-    allTrial_coeffpre = zeros(num_trials, num_pcs, num_pcs);
-    allTrial_varExplpre =zeros(num_pcs, num_trials);
-%     allTrial_scorepost = zeros(num_trials, length(pre_idx)+1,num_pcs);
-    allTrial_scorepost = cell(num_trials,1);
-    allTrial_coeffpost = zeros(num_trials, num_pcs, num_pcs);
-    allTrial_varExplpost =zeros(num_pcs, num_trials);
-
-    pc_diff_squared = zeros(num_trials, num_pcs);
-    pc_cumulative_explained = zeros( num_pcs, num_trials);
+    pc_explained_variance = zeros(num_trials, num_pcs);
 
     % Initialize matrix for normalized values
-    pc_diff_squared_z = zeros(size(pc_diff_squared));
+    coeff_z = zeros(num_pcs,num_pcs, num_trials);  % Preallocate numeric matrix
+
 
     % Loop through each selected trial
     for i = 1:num_trials
@@ -92,40 +78,9 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         trial_data = squeeze(beta_signal(:, :, i)); % Channels x Time
         
         % PCA on the whole epoch
-        [allTrial_coeff(i,:,:), allTrial_score(i,:,:), ~, ~, allTrial_varExpl(:, i)] = pca(trial_data');
-        allTrial_pre_pcs(i,:,:) = allTrial_score(i, pre_idx, :);
-%         allTrial_post_pcs(i,:,:) = allTrial_score(i, post_idx, :);
-        allTrial_post_pcs{i} = allTrial_score(i, post_idx, :);
-
-        % PCA on pre-stimulus window
-        pre_data = trial_data(:, pre_idx)';
-        [allTrial_coeffpre(i,:,:), allTrial_scorepre(i,:,:), ~, ~, allTrial_varExplpre(:, i)] = pca(pre_data);
-        
-        % PCA on post-stimulus window
-        post_data = trial_data(:, post_idx)';
-        [allTrial_coeffpost(i,:,:), allTrial_scorepost{i}, ~, ~, allTrial_varExplpost(:, i)] = pca(post_data);
-    
-        % Compute difference of sum, and square
-        pc_diff = sum(allTrial_scorepost{i}, 1) - sum(squeeze(allTrial_scorepre(i,:,:)), 1); % Sum across time, subtract pre from post
-
-        pc_diff_squared(i,:) = pc_diff.^2; % Square
-    
-        pc_mean = mean(pc_diff_squared(i, :));  % Mean across PCs for this trial
-        pc_std = std(pc_diff_squared(i, :));   % Standard deviation across PCs for this trial
-        
-        % Avoid division by zero
-        if pc_std == 0
-            pc_std = 1;
-        end
-        
-        % Compute z-score normalized values within the trial
-        pc_diff_squared_z(i, :) = (pc_diff_squared(i, :) - pc_mean) / pc_std;
-        
-        % Compute cumulative sum of explained variance
-        cumulative_explained_pre = cumsum(allTrial_varExplpre(:,i));
-        cumulative_explained_post = cumsum(allTrial_varExplpost(:, i));
-        pc_cumulative_explained (:, i) = cumulative_explained_post - cumulative_explained_pre; 
-
+        [coeff, ~, ~, ~, explained ] = pca(trial_data(:, pre_idx:post_idx)');
+        coeff_z(:,:,i) = coeff;    
+        pc_explained_variance (i,:) = explained; 
     end
 
 
@@ -134,20 +89,47 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     [~, filename, ~] = fileparts(file_path);
 
     % Save squared differences matrix as .mat file
-    save(fullfile(output_path, [filename '_pc_diff_squared_z.mat']), 'pc_diff_squared_z');
-    save(fullfile(output_path, [filename 'pc_cumulative_explained.mat']), 'pc_cumulative_explained');
+    save(fullfile(output_path, [filename 'coeff_z.mat']), 'coeff_z');
+    save(fullfile(output_path, [filename 'pc_explained_variance.mat']), 'pc_explained_variance');
     
+    threshold = 85;  % Target explained variance threshold
+
+    % Preallocate result
+    pc_at_85 = zeros(size(pc_explained_variance, 1), 1);
+    
+    for i = 1:size(pc_explained_variance, 1)
+        cum_sum = cumsum(pc_explained_variance(i, :));  % Compute cumulative sum for this trial
+        idx = find(cum_sum >= threshold, 1, 'first');     % Find first PC where cumulative sum ≥ 85
+        if ~isempty(idx)
+            pc_at_85(i) = idx;
+        else
+            pc_at_85(i) = NaN;  % If 85% is never reached
+        end
+    end
+
     if strcmp(condition, 'BLA') || strcmp(condition, 'BLT') || strcmp(condition, 'P1') 
         
         % Plot as heatmap
-        figure;
-        imagesc(1:length(epoch_trials)-1, 1:(length(pc_diff)), pc_diff_squared_z'); % Transpose so PCs are on the y-axis
-        colorbar;
-        xlabel('Trial Number');
-        ylabel('Principal Component');
-        title(['Squared Differences of PCs: ', filename]);
-        set(gca, 'YDir', 'normal'); % Ensure correct orientation
-        colormap jet;
+        figure('Position', [100, 100, 1200, 300]); % [x, y, width, height]
+        t = tiledlayout(1, 4, 'TileSpacing', 'Compact', 'Padding', 'Compact');  % Use layout handle
+        
+        % Set overall title
+        title(t, ['Normalized PCs that explain 85% of the variance ',filename], 'FontSize', 14, 'FontWeight', 'bold');
+        
+        for i = [1 4 8 25]
+            nexttile;
+            max_pc = pc_at_85(i);
+            imagesc(coeff_z(:,1:max_pc,i));  % PCs on y-axis
+            set(gca, 'YDir', 'normal');  % Ensure y-axis is oriented correctly
+            colormap jet;
+            colorbar;
+            
+            xlabel('PCs');
+            ylabel('Channels');
+            
+            % Set individual subplot title
+            title(['Trial# ', num2str(i)], 'FontSize', 12);
+        end
     
         % Save figure
         savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
@@ -161,34 +143,48 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         idx_2000 = ismember(epoch_trials, trials_2000ms);
         
         % Extract corresponding values
-        pc_diff_squared_z_500 = pc_diff_squared_z(idx_500, :);
-        pc_diff_squared_z_2000 = pc_diff_squared_z(idx_2000, :);
+        coeff_z_500 = coeff_z(:, :, idx_500);
+        coeff_z_2000 = coeff_z(:, :, idx_2000);
         
         % Plot in subplots
-        figure('Position', [100, 100, 1000, 400]); % [x, y, width, height]
+        figure('Position', [100, 100, 1200, 600]); % [x, y, width, height]
+        t = tiledlayout(2, 4, 'TileSpacing', 'Compact', 'Padding', 'Compact');  % Use layout handle
+
         
         % Subplot for 500ms trials
-        subplot(1, 2, 1);
-        imagesc(1:size(pc_diff_squared_z_500, 1), 1:(length(pc_diff_squared_z_500)), pc_diff_squared_z_500');
-        colorbar;
-        xlabel('Trial Number');
-        ylabel('Principal Component');
-        title('500ms Trials: Normalized Squared Differences');
-        set(gca, 'YDir', 'normal');
-        colormap jet;
+        % Set overall title
+        title(t, ['Normalized PCs that explain 85% of the variance ', filename], 'FontSize', 14, 'FontWeight', 'bold');
         
+        for i = [1 4 8 25]
+            nexttile;
+            max_pc = pc_at_85(i);
+            imagesc(coeff_z_500(:,1:max_pc,i));  % PCs on y-axis
+            set(gca, 'YDir', 'normal');  % Ensure y-axis is oriented correctly
+            colormap jet;
+            colorbar;
+            
+            xlabel('PCs');
+            ylabel('Channels');
+            
+            % Set individual subplot title
+            title(['500ms Trial# ', num2str(i)], 'FontSize', 12);
+        end
+
         % Subplot for 2000ms trials
-        subplot(1, 2, 2);
-        imagesc(1:size(pc_diff_squared_z_2000, 1), 1:(length(pc_diff_squared_z_2000)), pc_diff_squared_z_2000');
-        colorbar;
-        xlabel('Trial Number');
-        ylabel('Principal Component');
-        title('2000ms Trials: Normalized Squared Differences');
-        set(gca, 'YDir', 'normal');
-        colormap jet;
-        
-        % Ensure proper layout
-        sgtitle('Comparison of 500ms vs 2000ms Trials');
+         for i = [1 4 8 25]
+            nexttile;
+            max_pc = pc_at_85(i);
+            imagesc(coeff_z_2000(:,1:max_pc,i));  % PCs on y-axis
+            set(gca, 'YDir', 'normal');  % Ensure y-axis is oriented correctly
+            colormap jet;
+            colorbar;
+            
+            xlabel('PCs');
+            ylabel('Channels');
+            
+            % Set individual subplot title
+            title(['2000ms Trial# ', num2str(i)], 'FontSize', 12);
+        end
                 
         % Save figure
         savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
@@ -203,129 +199,56 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         idx_missing = ismember(epoch_trials, trials_missing);
         
         % Extract corresponding values
-        pc_diff_squared_z_500 = pc_diff_squared_z(idx_500, :);
-        pc_diff_squared_z_missing = pc_diff_squared_z(idx_missing, :);
+        coeff_z_500 = coeff_z(:, :, idx_500);
+        coeff_z_missing = coeff_z(:, :, idx_missing);
         
         % Plot in subplots
-        figure('Position', [100, 100, 1000, 400]); % [x, y, width, height]
+         % Plot in subplots
+        figure('Position', [100, 100, 1200, 600]); % [x, y, width, height]
+        t = tiledlayout(2, 4, 'TileSpacing', 'Compact', 'Padding', 'Compact');  % Use layout handle
+
         
         % Subplot for 500ms trials
-        subplot(1, 2, 1);
-        imagesc(1:size(pc_diff_squared_z_500, 1), 1:(length(pc_diff_squared_z_500)), pc_diff_squared_z_500');
-        colorbar;
-        xlabel('Trial Number');
-        ylabel('Principal Component');
-        title('500ms Trials: Normalized Squared Differences');
-        set(gca, 'YDir', 'normal');
-        colormap jet;
+        % Set overall title
+        title(t, ['Normalized PCs that explain 85% of the variance ', filename], 'FontSize', 14, 'FontWeight', 'bold');
         
-        % Subplot for 2000ms trials
-        subplot(1, 2, 2);
-        imagesc(1:size(pc_diff_squared_z_missing, 1), 1:(length(pc_diff_squared_z_missing)), pc_diff_squared_z_missing');
-        colorbar;
-        xlabel('Trial Number');
-        ylabel('Principal Component');
-        title('Missing Trials: Normalized Squared Differences');
-        set(gca, 'YDir', 'normal');
-        colormap jet;
+        for i = [1 4 8 25]
+            nexttile;
+            max_pc = pc_at_85(i);
+            imagesc(coeff_z_500(:,1:max_pc,i));  % PCs on y-axis
+            set(gca, 'YDir', 'normal');  % Ensure y-axis is oriented correctly
+            colormap jet;
+            colorbar;
+            
+            xlabel('PCs');
+            ylabel('Channels');
+            
+            % Set individual subplot title
+            title(['500ms Trial# ', num2str(i)], 'FontSize', 12);
+        end
         
-        % Ensure proper layout
-        sgtitle('Comparison of 500ms vs Missing Trials');
-        
+        % Subplot for Missing trials
+         for i = [1 4 8 25]
+            nexttile;
+            max_pc = pc_at_85(i);
+            imagesc(coeff_z_missing(:,1:max_pc,i));  % PCs on y-axis
+            set(gca, 'YDir', 'normal');  % Ensure y-axis is oriented correctly
+            colormap jet;
+            colorbar;
+            
+            xlabel('PCs');
+            ylabel('Channels');
+            
+            % Set individual subplot title
+            title(['Missing tactile Trial# ', num2str(i)], 'FontSize', 12);
+         end
+
         % Save figure
         savefig(fullfile(output_path, [filename '_pc_plot.fig'])); % Save as .fig
         saveas(gcf, fullfile(output_path, [filename '_pc_plot.png'])); % Save as .png
         close(gcf); % Close the figure to save memory
 
     end
-
-    figure('Position', [100, 100, 1200, 800]); % [x, y, width, height]
-    tiledlayout(4, 6)
-    sgtitle([filename 'Comparison of pre and post stimulus PCs']);
-    % Audrey's plot to compare selected PCs in trial1,4,8 and 60
-    for i = [1 4 8 num_trials]
-        % add the if statements for different conditions post_idx 
-        if strcmp(condition, 'BLA') || strcmp(condition, 'BLT')
-            post_window = [0, 0.4];  % Post-stimulus window (0ms to +400ms)
-        elseif strcmp(condition, 'P1')
-            post_window = [0, 1.020];  % Post-stimulus window (0ms to +1020ms)
-        elseif strcmp(condition, 'P2')
-            % Read data for both conditions
-            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
-            trials_2000ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 2000 ms tactil');
-            
-            if ismember(epoch_trials(i), trials_500ms)
-                post_window = [0, 1.020];  % 500ms condition
-            elseif ismember(epoch_trials(i), trials_2000ms)
-                post_window = [0, 2.400];  % 2000ms condition
-            else
-                continue; % Skip trials not in either list
-            end        
-            
-        elseif strcmp(condition, 'P3')
-            trials_500ms = readmatrix(excel_file_path, 'Sheet', 'Audio onset with 500 ms tactile');
-            trials_missing = readmatrix(excel_file_path, 'Sheet', 'Audio onset with missing tactil');
-
-            if ismember(epoch_trials(i), trials_500ms)
-                post_window = [0, 1.020];  % 500ms condition
-            elseif ismember(epoch_trials(i), trials_missing)
-                post_window = [0, 1.020];  % missing condition
-            else
-                continue; % Skip trials not in either list
-            end        
-            
-        end
-
-        post_idx = find(time_vector >= post_window(1) & time_vector <= post_window(2));
-
-        nexttile
-        plot(time_vector(pre_idx), squeeze(allTrial_pre_pcs(i,:,:)) )
-        hold on
-        plot(time_vector(pre_idx), squeeze(allTrial_scorepre(i,:, :)), '.-', 'linewidth', 1)
-        title(['trial ' num2str(i) ', pre'])
-        ylabel('components (pre)')
-        xlabel('time')
-        
-        nexttile
-        plot(time_vector(post_idx), squeeze(allTrial_post_pcs{i}))
-        hold on
-        plot(time_vector(post_idx), squeeze(allTrial_scorepost{i}), '.-', 'linewidth', 1)
-        title(['trial ' num2str(i) ', post'])
-        ylabel('components (post)')
-        xlabel('time')
-        
-        nexttile
-        imagesc(squeeze(allTrial_coeff (i, :,1:4)))
-        ylabel('channels')
-        xlabel('PC#')
-        title('channel weights, full')
-        
-        nexttile
-        imagesc(squeeze(allTrial_coeffpre(i, :, 1:4)))
-        ylabel('channels')
-        xlabel('PC#')
-        title('channel weights, pre')
-        
-        nexttile
-        imagesc(squeeze(allTrial_coeffpost(i, :, 1:4)))
-        ylabel('channels')
-        xlabel('PC#')
-        title('channel weights, post')
-        
-        nexttile
-        hold on
-        plot(allTrial_varExpl(:,i), 'o-')
-        plot(allTrial_varExplpre(:,i), '*-')
-        plot(allTrial_varExplpost(:,i), '^-')
-        xlim([0 6])
-        ylabel('PC VarExpl')
-        legend({'full', 'pre', 'post'})
-    end
-
-    % Save figure
-    savefig(fullfile(output_path, [filename '_pc_prePost_plot.fig'])); % Save as .fig
-    saveas(gcf, fullfile(output_path, [filename '_pc_prePost_plot.png'])); % Save as .png
-    close(gcf); % Close the figure to save memory
     
     fprintf('Processing complete: %s\n', filename);
 

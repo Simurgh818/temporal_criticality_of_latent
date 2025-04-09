@@ -32,7 +32,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Convert time to indices
     pre_idx = find(time_vector >= pre_window(1) & time_vector <= pre_window(2));
-    post_idx = [];
+
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
     pc_explained_variance = zeros(num_trials, num_pcs);
@@ -79,7 +79,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         
         % PCA on the whole epoch
         [coeff, ~, ~, ~, explained ] = pca(trial_data(:, pre_idx:post_idx)');
-        coeff_z(:,:,i) = coeff;    
+        coeff_z(:,:,i) = zscore(coeff);    
         pc_explained_variance (i,:) = explained; 
     end
 

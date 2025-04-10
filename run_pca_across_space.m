@@ -36,6 +36,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
     % Initialize results matrix (Trials x PCs)
     num_pcs = 32; % Number of Principal Components to extract
     pc_explained_variance = zeros(num_trials, num_pcs);
+    pc_cumulative_variance = zeros(num_trials, num_pcs);
 
     % Initialize matrix for normalized values
     coeff_z = zeros(num_pcs,num_pcs, num_trials);  % Preallocate numeric matrix
@@ -79,8 +80,10 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
         
         % PCA on the whole epoch
         [coeff, ~, ~, ~, explained ] = pca(trial_data(:, pre_idx:post_idx)');
-        coeff_z(:,:,i) = zscore(coeff);    
-        pc_explained_variance (i,:) = explained; 
+        coeff_z(:,:,i) = zscore(coeff);
+        pc_explained_variance(i,:) = explained;
+        cumulative_variance = cumsum(explained,1);
+        pc_cumulative_variance (i,:) = cumulative_variance; 
     end
 
 
@@ -90,7 +93,7 @@ function run_pca_across_space(file_path, output_path, condition, excel_file_path
 
     % Save squared differences matrix as .mat file
     save(fullfile(output_path, [filename 'coeff_z.mat']), 'coeff_z');
-    save(fullfile(output_path, [filename 'pc_explained_variance.mat']), 'pc_explained_variance');
+    save(fullfile(output_path, [filename 'pc_cumulative_variance.mat']), 'pc_cumulative_variance');
     
     threshold = 85;  % Target explained variance threshold
 

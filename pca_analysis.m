@@ -1,7 +1,8 @@
 clear; 
 % Define conditions
 conditions = {'BLA','BLT', 'P1', 'P2', 'P3'}; %  
-
+subjects ={'BOS2','BOS3','BOS5','BOS6','BOS7','BOS8','BOS9','BOS10',...
+    'BOS11','BOS12','BOS13','BOS15','BOS16','BOS17'};
 % Set input and output paths based on system
 if exist('H:\', 'dir')
     base_input_path = 'H:\My Drive\Data\New Data\EEG epoched';
@@ -12,6 +13,15 @@ elseif exist('G:\', 'dir')
 else
     error('Unknown system: Cannot determine input and output paths.');
 end
+
+parfor s =1:length(subjects)
+    output_path_condition = fullfile(base_output_path,'pca_across_conditions', string(subjects(s)));
+    if ~exist(output_path_condition, 'dir')
+        mkdir(output_path_condition);
+    end
+    run_pca_across_conditions(base_input_path, output_path_condition, conditions, string(subjects(s)));
+end
+
 
 % Loop over each condition
 for i = 1:length(conditions)
@@ -37,7 +47,7 @@ for i = 1:length(conditions)
     for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
-        run_pca_across_space(file_path, output_path, condition, excel_file_path);
+        % run_pca_across_space(file_path, output_path, condition, excel_file_path);
         clear EEG beta_signal trial_data coeff score pre_pcs post_pcs pc_diff;
         
     end

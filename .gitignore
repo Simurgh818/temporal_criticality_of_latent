@@ -2,3 +2,5 @@
 run_pca_across_space.asv
 pca_analysis.asv
 run_pca_across_conditions.asv
+run_tca.asv
+tca_analysis.asv

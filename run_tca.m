@@ -213,15 +213,19 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         threshold = 0.85;  % Target explained variance threshold    
         pc_at_85_pre = find(round(explained_variance_pre,2) >= threshold, 1, 'first');
         pc_at_85_post = find(round(explained_variance_post,2) >= threshold, 1, 'first');
+
         if isempty(pc_at_85_pre)
-            [U_pre,~ ] = cpd(pre_data, num_pcs);
-        elseif isempty(pc_at_85_post)
-            [U_post,~ ] = cpd(post_data, num_pcs);
+            [U_pre, ~] = cpd(pre_data, num_pcs);
         else
-            [U_pre,~ ] = cpd(pre_data, pc_at_85_pre);
-            [U_post,~ ] = cpd(post_data, pc_at_85_post);
-        end    
+            [U_pre, ~] = cpd(pre_data, pc_at_85_pre);
+        end
         
+        if isempty(pc_at_85_post)
+            [U_post, ~] = cpd(post_data, num_pcs);
+        else
+            [U_post, ~] = cpd(post_data, pc_at_85_post);
+        end  
+                
         save(fullfile(output_path, [subject '_U_pre.mat']), 'U_pre');
         save(fullfile(output_path, [subject '_U_post.mat']), 'U_post');
     

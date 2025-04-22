@@ -1,6 +1,6 @@
 clear; 
 % Define conditions
-conditions = {'BLA', 'BLT', 'P1','P2', 'P3'}; %  
+conditions = { 'P1','P2', 'P3'}; % 'BLA', 'BLT',  
 subjects ={'BOS2','BOS3','BOS5','BOS6','BOS7','BOS8','BOS9','BOS10',...
     'BOS11','BOS12','BOS13','BOS15','BOS16','BOS17'};
 % Set input and output paths based on system
@@ -35,7 +35,7 @@ for i = 1:length(conditions)
     set_files = dir(fullfile(input_path, '*.set'));
     
     % Loop over each subject's dataset
-    for j = 14:length(set_files)
+    for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
         run_tca(file_path, output_path, condition, excel_file_path);

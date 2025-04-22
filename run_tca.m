@@ -199,7 +199,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         title('Explained Variance Post stim vs. Number of Components');
         grid on;
     
-        sgtitle([subject 'Reconstruction Error and Explained Variance']);
+        sgtitle([subject ' Reconstruction Error and Explained Variance']);
         
     
         % Save squared differences matrix as .mat file
@@ -210,20 +210,18 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         saveas(gcf, fullfile(output_path, [subject '_reconstruction_error_and_explained_variance.fig']));
         saveas(gcf, fullfile(output_path, [subject '_reconstruction_error_and_explained_variance.png']));
     
-        threshold = 0.85;  % Target explained variance threshold
-    
-        % Preallocate result
-        pc_at_85_pre = zeros(1, 1);
-        pc_at_85_post = zeros(1, 1);
-    
+        threshold = 0.85;  % Target explained variance threshold    
         pc_at_85_pre = find(round(explained_variance_pre,2) >= threshold, 1, 'first');
         pc_at_85_post = find(round(explained_variance_post,2) >= threshold, 1, 'first');
-        if isempty(pc_at_85_post)
-            pc_at_85_post = 59;
-        end
-    
-        [U_pre,~ ] = cpd(pre_data, pc_at_85_pre);
-        [U_post,~ ] = cpd(post_data, pc_at_85_post);
+        if isempty(pc_at_85_pre)
+            [U_pre,~ ] = cpd(pre_data, num_pcs);
+        elseif isempty(pc_at_85_post)
+            [U_post,~ ] = cpd(post_data, num_pcs);
+        else
+            [U_pre,~ ] = cpd(pre_data, pc_at_85_pre);
+            [U_post,~ ] = cpd(post_data, pc_at_85_post);
+        end    
+        
         save(fullfile(output_path, [subject '_U_pre.mat']), 'U_pre');
         save(fullfile(output_path, [subject '_U_post.mat']), 'U_post');
     
@@ -255,7 +253,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
             ylabel('Loading');
             grid on;
         end
-        sgtitle([subject 'Neuron, Temporal, and Trial Factor Loadings (Pre-Stimulus)']);
+        sgtitle([subject ' Neuron, Temporal, and Trial Factor Loadings (Pre-Stimulus)']);
         saveas(gcf, fullfile(output_path, [subject '_pre_stimulus_factors_loadings.fig']));
         saveas(gcf, fullfile(output_path, [subject '_pre_stimulus_factors_loadings.png']));
     
@@ -287,7 +285,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
             ylabel('Loading');
             grid on;
         end
-        sgtitle([subject 'Neuron, Temporal, and Trial Factor Loadings (Post-Stimulus)']);
+        sgtitle([subject ' Neuron, Temporal, and Trial Factor Loadings (Post-Stimulus)']);
         saveas(gcf, fullfile(output_path, [subject '_post_stimulus_factors_loadings.fig']));
         saveas(gcf, fullfile(output_path, [subject '_post_stimulus_factors_loadings.png']));
 
@@ -313,7 +311,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         plot(num_components, explained_variance_post_p2_2000ms, 's-', 'LineWidth', 2);
         xlabel('Number of Components'); ylabel('Explained Variance');
         title('Explained Variance 2000ms Trials'); grid on;
-        sgtitle([subject 'Reconstruction Error and Explained Variance']);
+        sgtitle([subject ' Reconstruction Error and Explained Variance']);
         saveas(gcf, fullfile(output_path, [subject '_p2_reconstruction_error_and_explained_variance.fig']));
         saveas(gcf, fullfile(output_path, [subject '_p2_reconstruction_error_and_explained_variance.png']));
     
@@ -356,7 +354,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
                 title(['Trial - Comp ' num2str(comp)]);
                 xlabel('Trial'); ylabel('Loading'); grid on;
             end
-            sgtitle([subject 'Neuron, Temporal, Trial Factor Loadings - ' tag]);
+            sgtitle([subject ' Neuron, Temporal, Trial Factor Loadings - ' tag]);
             saveas(gcf, fullfile(output_path, [subject '_p2_factors_loadings_' tag '.fig']));
             saveas(gcf, fullfile(output_path, [subject '_p2_factors_loadings_' tag '.png']));
         end
@@ -383,7 +381,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         plot(num_components, explained_variance_post_p3_missing, 's-', 'LineWidth', 2);
         xlabel('Number of Components'); ylabel('Explained Variance');
         title('Explained Variance Missing Trials'); grid on;
-        sgtitle([subject 'Reconstruction Error and Explained Variance']);
+        sgtitle([subject ' Reconstruction Error and Explained Variance']);
 
         saveas(gcf, fullfile(output_path, [subject '_p3_reconstruction_error_and_explained_variance.fig']));
         saveas(gcf, fullfile(output_path, [subject '_p3_reconstruction_error_and_explained_variance.png']));
@@ -425,7 +423,7 @@ function run_tca(file_path, output_path, condition, excel_file_path)
                 title(['Trial - Comp ' num2str(comp)]);
                 xlabel('Trial'); ylabel('Loading'); grid on;
             end
-            sgtitle([subject 'Neuron, Temporal, Trial Factor Loadings - ' tag]);
+            sgtitle([subject ' Neuron, Temporal, Trial Factor Loadings - ' tag]);
             saveas(gcf, fullfile(output_path, [subject '_p3_factors_loadings_' tag '.fig']));
             saveas(gcf, fullfile(output_path, [subject '_p3_factors_loadings_' tag '.png']));
         end

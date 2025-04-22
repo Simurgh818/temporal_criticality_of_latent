@@ -1,6 +1,6 @@
 clear; 
 % Define conditions
-conditions = { 'P2', 'P3'}; %  'BLA','BLT', 'P1',
+conditions = { 'BLA','BLT', 'P1','P2', 'P3'}; %  
 subjects ={'BOS2','BOS3','BOS5','BOS6','BOS7','BOS8','BOS9','BOS10',...
     'BOS11','BOS12','BOS13','BOS15','BOS16','BOS17'};
 % Set input and output paths based on system

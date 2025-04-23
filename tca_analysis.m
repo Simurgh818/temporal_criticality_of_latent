@@ -44,3 +44,4 @@ for i = 1:length(conditions)
     end
 
 end
+tca_factor_analysis(base_output_path);

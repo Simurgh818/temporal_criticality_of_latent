@@ -109,17 +109,10 @@ function run_tca(file_path, output_path, condition, excel_file_path)
     reconstruction_errors_post = zeros(size(num_components));
     explained_variance_post = zeros(size(num_components));
     
-    if isempty(gcp('nocreate'))
-        parpool; % Uses default number of workers
-    end
-    
-    % if iscell(post_data)
-    %     post_data = cell2mat(post_data);
-    % end
     [~, filename, ~] = fileparts(file_path);
     parts = split(filename, ' ');
     subject  = parts{end};
-    parfor idx = 1:length(num_components)
+    for idx = 1:length(num_components)
         k = num_components(idx);
     
         [U_pre, ~] = cpd(pre_data, k, 'Display', 0);
@@ -203,8 +196,8 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         
     
         % Save squared differences matrix as .mat file
-        save(fullfile(output_path, [subject '_preconstruction_errors_pre.mat']), 'reconstruction_errors_pre');
-        save(fullfile(output_path, [subject '_preconstruction_errors_post.mat']), 'reconstruction_errors_post');
+        save(fullfile(output_path, [subject '_reconstruction_errors_pre.mat']), 'reconstruction_errors_pre');
+        save(fullfile(output_path, [subject '_reconstruction_errors_post.mat']), 'reconstruction_errors_post');
         save(fullfile(output_path, [subject '_explained_variance_pre.mat']), 'explained_variance_pre');
         save(fullfile(output_path, [subject '_explained_variance_post.mat']), 'explained_variance_post');
         saveas(gcf, fullfile(output_path, [subject '_reconstruction_error_and_explained_variance.fig']));
@@ -320,11 +313,14 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         saveas(gcf, fullfile(output_path, [subject '_p2_reconstruction_error_and_explained_variance.png']));
     
         % Save errors and variances
+        save(fullfile(output_path, [subject '_reconstruction_errors_pre_p2.mat']), 'reconstruction_errors_pre');
         save(fullfile(output_path, [subject '_reconstruction_errors_post_p2_500ms.mat']), 'reconstruction_errors_post_p2_500ms');
         save(fullfile(output_path, [subject '_reconstruction_errors_post_p2_2000ms.mat']), 'reconstruction_errors_post_p2_2000ms');
+        save(fullfile(output_path, [subject '_explained_variance_pre_p2.mat']), 'explained_variance_pre');
         save(fullfile(output_path, [subject '_explained_variance_post_p2_500ms.mat']), 'explained_variance_post_p2_500ms');
         save(fullfile(output_path, [subject '_explained_variance_post_p2_2000ms.mat']), 'explained_variance_post_p2_2000ms');
-    
+     
+
         % Save CPD for top 9 components for each condition
         [U_post_500ms, ~] = cpd(post_data_p2_500ms, 9);
         [U_post_2000ms, ~] = cpd(post_data_p2_2000ms, 9);
@@ -389,9 +385,11 @@ function run_tca(file_path, output_path, condition, excel_file_path)
 
         saveas(gcf, fullfile(output_path, [subject '_p3_reconstruction_error_and_explained_variance.fig']));
         saveas(gcf, fullfile(output_path, [subject '_p3_reconstruction_error_and_explained_variance.png']));
-    
+
+        save(fullfile(output_path, [subject '_reconstruction_errors_pre_p3.mat']), 'reconstruction_errors_pre');
         save(fullfile(output_path, [subject '_reconstruction_errors_post_p3_500ms.mat']), 'reconstruction_errors_post_p3_500ms');
         save(fullfile(output_path, [subject '_reconstruction_errors_post_p3_missing.mat']), 'reconstruction_errors_post_p3_missing');
+         save(fullfile(output_path, [subject '_explained_variance_pre_p3.mat']), 'explained_variance_pre');
         save(fullfile(output_path, [subject '_explained_variance_post_p3_500ms.mat']), 'explained_variance_post_p3_500ms');
         save(fullfile(output_path, [subject '_explained_variance_post_p3_missing.mat']), 'explained_variance_post_p3_missing');
     

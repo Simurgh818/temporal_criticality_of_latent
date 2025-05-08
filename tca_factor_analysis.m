@@ -26,7 +26,7 @@ function tca_factor_analysis(base_output_path)
                 
                 % Extract subject name
                 [~, file_name, ~] = fileparts(pre_files(j).name);
-                subject_name = strrep(file_name, '_explained_variance_pre_p2', '');
+                subject_name = strrep(file_name, '_explained_variance_pre', '');
                 sanitized_subject_name = matlab.lang.makeValidName(subject_name);
                 
                 % Store data
@@ -230,8 +230,8 @@ function tca_factor_analysis(base_output_path)
     threshold = 0.85; % 85% variance threshold
     
     % Define all possible condition combinations
-    all_conditions = {'BLA_pre', 'BLA_post', 'BLT_pre', 'BLT_post', 'P1_pre', 'P1_post', ...
-                     'P2_pre', 'P2_500ms', 'P2_2000ms', 'P3_pre', 'P3_500ms', 'P3_missing'};
+    all_conditions = {'BLA-pre', 'BLA-post', 'BLT-pre', 'BLT-post', 'P1-pre', 'P1-post', ...
+                     'P2-pre', 'P2-500ms', 'P2-2000ms', 'P3-pre', 'P3-500ms', 'P3-missing'};
     
     % Initialize table data
     table_data = zeros(length(subject_names), length(all_conditions));
@@ -241,14 +241,16 @@ function tca_factor_analysis(base_output_path)
         subject_name = subject_names{s};
         for c = 1:length(all_conditions)
             condition = all_conditions{c};
-            if isfield(subject_data.(subject_name), condition)
-                variance_data = subject_data.(subject_name).(condition);
+            % Convert hyphen to underscore for field access since MATLAB struct fields use underscores
+            condition_field = strrep(condition, '-', '_');
+            if isfield(subject_data.(subject_name), condition_field)
+                variance_data = subject_data.(subject_name).(condition_field);
 
                 % Compute cumulative explained variance and find when it first reaches 85%
                 cum_variance = cumsum(variance_data);              % cumulative sum across PCs
                 factor_count = find(cum_variance >= threshold, 1); % first k such that cum_variance(k) >= 0.85
                 if isempty(factor_count)
-                    % if even all PCs don’t reach 85%, use the maximum
+                    % if even all PCs don't reach 85%, use the maximum
                     factor_count = numel(variance_data);
                 end
 
@@ -260,65 +262,101 @@ function tca_factor_analysis(base_output_path)
     % Create table
     results_table = array2table(table_data, 'VariableNames', all_conditions, 'RowNames', subject_names);
     
-    % Calculate mean number of factors across subjects for each condition
-    mean_factors = mean(table_data, 1, 'omitnan');
-    std_factors = std(table_data, 0, 1, 'omitnan');
+    % Create a new summary table that shows stats for each condition type (BLA, BLT, etc.)
+    % by filtering subjects that contain those condition prefixes
     
-    % Create summary table
-    summary_table = array2table([mean_factors; std_factors], 'VariableNames', all_conditions, ...
-                             'RowNames', {'Mean', 'StdDev'});
+    % First, let's create data structures to store condition-specific summary stats
+    condition_subjects = struct();
+    condition_means = zeros(1, length(all_conditions));
+    condition_stds = zeros(1, length(all_conditions));
     
-    % Save result and summary tables in each condition folder
-    for i = 1:length(conditions)
-        condition = conditions{i};
-        condition_path = fullfile(base_output_path, condition);
+    % For each condition, find subjects that contain that condition name
+    for c = 1:length(all_conditions)
+        condition = all_conditions{c};
+        % Get the main condition name before the hyphen (e.g., BLA from BLA-pre)
+        parts = strsplit(condition, '-');
+        main_condition = parts{1};
         
-        % Save the main results table for this condition
-        writetable(results_table, fullfile(condition_path, 'factors_at_85_percent.csv'), 'WriteRowNames', true);
+        % Convert back to underscore for internal field naming
+        condition_underscore = strrep(condition, '-', '_');
         
-        % Save the summary table for this condition
-        writetable(summary_table, fullfile(condition_path, 'factors_at_85_percent_summary.csv'), 'WriteRowNames', true);
+        % Find subjects with this condition in their name
+        matching_subjects = false(length(subject_names), 1);
+        for s = 1:length(subject_names)
+            subject_name = subject_names{s};
+            if contains(subject_name, main_condition)
+                matching_subjects(s) = true;
+            end
+        end
+        
+        % Calculate mean and std only for matching subjects
+        if any(matching_subjects)
+            condition_data = table_data(matching_subjects, c);
+            condition_data = condition_data(~isnan(condition_data)); % Remove NaNs
+            if ~isempty(condition_data)
+                condition_means(c) = mean(condition_data, 'omitnan');
+                condition_stds(c) = std(condition_data, 0, 'omitnan');
+            end
+        end
+        
+        % Store which subjects are related to this condition for reference
+        condition_subjects.(main_condition) = subject_names(matching_subjects);
     end
     
-    % Create and save heatmap in each condition folder
-    for i = 1:length(conditions)
-        condition = conditions{i};
-        condition_path = fullfile(base_output_path, condition);
-        
-        % Create heatmap figure
-        figure('Position', [100, 100, 1200, 800]);
-        
-        % Plot heatmap
-        h = heatmap(all_conditions, subject_names, table_data);
-        h.Title = 'Number of Factors Required to Explain 85% of Variance';
-        h.XLabel = 'Condition';
-        h.YLabel = 'Subject';
-        h.Colormap = parula;
-        
-        % Save heatmap in this condition folder
-        saveas(gcf, fullfile(condition_path, 'factors_at_85_percent_heatmap.fig'));
-        saveas(gcf, fullfile(condition_path, 'factors_at_85_percent_heatmap.png'));
-        close(gcf);
-        
-        % Create bar chart of mean factors
-        figure('Position', [100, 100, 1200, 600]);
-        bar(mean_factors);
-        hold on;
-        errorbar(1:length(mean_factors), mean_factors, std_factors, 'k.', 'LineWidth', 1.5);
-        xlabel('Condition');
-        ylabel('Mean Number of Factors for 85% Explained Variance');
-        title('Mean Number of Factors Required to Explain 85% of Variance');
-        xticks(1:length(all_conditions));
-        xticklabels(all_conditions);
-        xtickangle(45);
-        grid on;
-        
-        % Save bar chart in this condition folder
-        saveas(gcf, fullfile(condition_path, 'factors_at_85_percent_barchart.fig'));
-        saveas(gcf, fullfile(condition_path, 'factors_at_85_percent_barchart.png'));
-        close(gcf);
+    % Create summary table with condition-specific stats only
+    summary_table = array2table([condition_means; condition_stds], 'VariableNames', all_conditions, ...
+                             'RowNames', {'Condition_Specific_Mean', 'Condition_Specific_StdDev'});
+              
+    % Save the main results table 
+    writetable(results_table, fullfile(base_output_path, 'factors_at_85_percent.csv'), 'WriteRowNames', true);
+    
+    % Save the summary table 
+    writetable(summary_table, fullfile(base_output_path, 'factors_at_85_percent_summary.csv'), 'WriteRowNames', true);
+    
+    % Create a text file that shows which subjects were used for each condition's stats
+    fid = fopen(fullfile(base_output_path, 'condition_specific_subjects.txt'), 'w');
+    if fid ~= -1
+        main_conditions = {'BLA', 'BLT', 'P1', 'P2', 'P3'};
+        for i = 1:length(main_conditions)
+            cond = main_conditions{i};
+            if isfield(condition_subjects, cond)
+                fprintf(fid, '%s subjects: %s\n', cond, strjoin(condition_subjects.(cond), ', '));
+            end
+        end
+        fclose(fid);
     end
     
-    % Print completion message
-    fprintf('Analysis complete. Results saved to individual condition folders.\n');
+    %  Create a single heatmap (subjects × all_conditions)
+    figure('Position',[100,100,1200,800]);
+    h = heatmap(all_conditions, subject_names, table_data);
+    h.Title  = 'Number of Factors Required to Explain 85% of Variance';
+    h.XLabel = 'Condition';
+    h.YLabel = 'Subject';
+    h.Colormap = parula;
+    % Save to parent folder
+    saveas(gcf, fullfile(base_output_path, 'factors_at_85_percent_heatmap.fig'));
+    saveas(gcf, fullfile(base_output_path, 'factors_at_85_percent_heatmap.png'));
+    close(gcf);
+
+    % Removed overall bar chart as requested
+    
+    % Create a bar chart for condition-specific means
+    figure('Position',[100,100,1200,600]);
+    bar(condition_means);
+    hold on;
+    errorbar(1:length(condition_means), condition_means, condition_stds, 'k.', 'LineWidth', 1.5);
+    xlabel('Condition');
+    ylabel('Mean Number of Factors for 85% Explained Variance');
+    title('Mean Number of Factors Required to Explain 85% of Variance');
+    xticks(1:length(all_conditions));
+    xticklabels(all_conditions);
+    xtickangle(45);
+    grid on;
+    % Save to parent folder
+    saveas(gcf, fullfile(base_output_path, 'factors_at_85_percent_barchart.fig'));
+    saveas(gcf, fullfile(base_output_path, 'factors_at_85_percent_barchart.png'));
+    close(gcf);
+
+    % Final completion message
+    fprintf('Analysis complete. Results saved to %s\n', base_output_path);
 end

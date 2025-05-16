@@ -8,3 +8,5 @@ umap_time_parameter_exploration.mat
 .ipynb_checkpoints/sliceTCA-checkpoint.ipynb
 tca_factor_analysis.asv
 umap_parameter_exploration.mat
+pca_per_channel_frontal_unfiltered_trial.m
+run_pca_per_channel.m

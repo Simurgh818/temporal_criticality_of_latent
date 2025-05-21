@@ -322,8 +322,8 @@ function run_tca(file_path, output_path, condition, excel_file_path)
      
 
         % Save CPD for top 9 components for each condition
-        [U_post_500ms, ~] = cpd(post_data_p2_500ms, 9);
-        [U_post_2000ms, ~] = cpd(post_data_p2_2000ms, 9);
+        [U_post_500ms, ~] = cpd(post_data_p2_500ms, num_pcs);
+        [U_post_2000ms, ~] = cpd(post_data_p2_2000ms, num_pcs);
         save(fullfile(output_path, [subject '_U_post_p2_500ms.mat']), 'U_post_500ms');
         save(fullfile(output_path, [subject '_U_post_p2_2000ms.mat']), 'U_post_2000ms');
     
@@ -393,8 +393,8 @@ function run_tca(file_path, output_path, condition, excel_file_path)
         save(fullfile(output_path, [subject '_explained_variance_post_p3_500ms.mat']), 'explained_variance_post_p3_500ms');
         save(fullfile(output_path, [subject '_explained_variance_post_p3_missing.mat']), 'explained_variance_post_p3_missing');
     
-        [U_post_500ms, ~] = cpd(post_data_p3_500ms, 9);
-        [U_post_missing, ~] = cpd(post_data_p3_missing, 9);
+        [U_post_500ms, ~] = cpd(post_data_p3_500ms, num_pcs);
+        [U_post_missing, ~] = cpd(post_data_p3_missing, num_pcs);
         save(fullfile(output_path, [subject '_U_post_p3_500ms.mat']), 'U_post_500ms');
         save(fullfile(output_path, [subject '_U_post_p3_missing.mat']), 'U_post_missing');
     

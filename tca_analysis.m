@@ -52,7 +52,7 @@ for i = 1:length(conditions)
     % for j = 1:length(set_files)
         file_path = fullfile(input_path, set_files(j).name);
         fprintf('Processing %s...\n', file_path);
-        run_tca(file_path, output_path, condition, excel_file_path);
+        % run_tca(file_path, output_path, condition, excel_file_path);
         % clear EEG beta_signal;
     end
 end

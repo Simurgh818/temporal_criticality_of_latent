@@ -247,8 +247,8 @@ function tca_factor_analysis(base_output_path)
                 variance_data = subject_data.(subject_name).(condition_field);
 
                 % Compute cumulative explained variance and find when it first reaches 85%
-                cum_variance = cumsum(variance_data);              % cumulative sum across PCs
-                factor_count = find(cum_variance >= threshold, 1); % first k such that cum_variance(k) >= 0.85
+                % cum_variance = cumsum(variance_data);              % cumulative sum across PCs
+                factor_count = find(variance_data >= threshold, 1); % first k such that cum_variance(k) >= 0.85
                 if isempty(factor_count)
                     % if even all PCs don't reach 85%, use the maximum
                     factor_count = numel(variance_data);
